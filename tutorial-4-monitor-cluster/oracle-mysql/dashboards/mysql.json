@@ -4973,8 +4973,8 @@
     "type": "timepicker"
   },
   "timezone": "",
-  "title": "MySQL",
-  "uid": "mysql",
+  "title": "Oracle-Mysql",
+  "uid": "oracle",
   "version": 1,
   "weekStart": ""
 }
