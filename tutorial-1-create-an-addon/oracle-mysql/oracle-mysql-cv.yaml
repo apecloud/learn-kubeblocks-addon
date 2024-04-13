@@ -1,0 +1,13 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: ClusterVersion
+metadata:
+  name: oracle-mysql-8.0.32
+spec:
+  clusterDefinitionRef: oracle-mysql
+  componentVersions:
+  - componentDefRef: mysql-compdef
+    versionsContext:
+      containers:
+      - name: mysql-container2
+        image: docker.io/mysql:8.0.32
+        imagePullPolicy: IfNotPresent

@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: default
+spec:
+  clusterDefinitionRef: oracle-mysql
+  clusterVersionRef: oracle-mysql-8.0.32
+  componentSpecs:
+  - componentDefRef: mysql-compdef
+    name: mysql-comp
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+      requests:
+        cpu: "1"
+        memory: 1Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        storageClassName: standard
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete

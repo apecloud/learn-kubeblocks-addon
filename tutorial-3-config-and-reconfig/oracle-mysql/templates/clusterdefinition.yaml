@@ -20,9 +20,6 @@ spec:
           - name: mysql
             port: 3306
             targetPort: mysql
-      volumeTypes:
-        - name: data
-          type: data
       configSpecs:
         - name: mysql-config
           templateRef: oracle-mysql-config-template
