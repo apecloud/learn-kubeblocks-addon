@@ -83,7 +83,9 @@ spec:
 3. 集群的连接凭证: root用户, 随机密码
 
 `podSpec`和`service`字段分别描述了组件的容器和服务的属性, 可以根据实际情况进行修改.
-`connectionCredential`字段描述了集群的连接凭证. 在创建Cluster时, KubeBlocks会先创建一个 secret，其命名规则为 {clusterName}-conn-credential。它包含用户名、密码、endpoint、port 等常规信息，在其他服务访问该集群时使用（这个 secret 会先于其他资源创建，可以在其他地方引用该对象）。 在这个字段中，可以使用一些占位符来引用其他字段的值，如 $(SVC_FQDN)、$(SVC_PORT_mysql)、$(RANDOM_PASSWD) 等。
+`connectionCredential`字段描述了集群的连接凭证.
+
+在创建Cluster时, KubeBlocks会先创建一个 secret，其命名规则为 {clusterName}-conn-credential。它包含用户名、密码、endpoint、port 等常规信息，在其他服务访问该集群时使用（这个 secret 会先于其他资源创建，可以在其他地方引用该对象）。 在这个字段中，可以使用一些占位符来引用其他字段的值，如 `$(SVC_FQDN)`、`$(SVC_PORT_mysql)`、`$(RANDOM_PASSWD)` 等。
 
 | 占位符 | 描述 |
 | --- | --- |

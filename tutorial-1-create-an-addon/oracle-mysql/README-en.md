@@ -79,7 +79,7 @@ ClusterDefinition object mainly describes the following information:
 - connection credentials of the cluster (to be accsessed by internal/external services)
 
 The `podSpec` and `service` fields describe the properties of the component's container and service, which can be modified according to the actual situation.
-The `connectionCredential` field describes the connection credentials of the cluster. When creating a Cluster, KubeBlocks will first create a secret, named after `{clusterName}-conn-credential`. It contains regular information such as username, password, endpoint, port, etc., which is used when other services access this cluster (this secret will be created before other resources, and you can reference this object elsewhere). In this field, you can use some placeholders to reference the values of other fields, such as $(SVC_FQDN), $(SVC_PORT_mysql), $(RANDOM_PASSWD), etc.
+The `connectionCredential` field describes the connection credentials of the cluster. When creating a Cluster, KubeBlocks will first create a secret, named after `{clusterName}-conn-credential`. It contains regular information such as username, password, endpoint, port, etc., which is used when other services access this cluster (this secret will be created before other resources, and you can reference this object elsewhere). In this field, you can use some placeholders to reference the values of other fields, such as `$(SVC_FQDN)`, `$(SVC_PORT_mysql)`, `$(RANDOM_PASSWD)`, etc.
 
 Some common placeholders are as follows:
 
