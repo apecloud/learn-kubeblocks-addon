@@ -5,9 +5,23 @@
 ## 教程目标
 介绍如何在KubeBlocks上创建一个MySQL数据库实例。
 
+教程中使用的`YAML` 示例可以在 `./examples`目录下找到, 此外还在`./chart`目录下提供了`Helm`示例.
+```txt
+├── README-cn.md  # readme 文件
+├── README-en.md  # readme 文件
+├── charts        # Helm 示例
+│   ├── oracle-mysql  # clusterdefiniton和clusterversion的Helm示例
+│   └── oracle-mysql-cluster # cluster的Helm示例
+└── examples      # YAML 示例
+    ├── mycluster.yaml
+    ├── oracle-mysql-cd.yaml
+    └── oracle-mysql-cv.yaml
+```
+
 ## 相关CRD
 - [ClusterDefinition](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1alpha1.ClusterDefinition)
 - [ClusterVersion](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1alpha1.ClusterVersion)
+- [Addon](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/add-on#extensions.kubeblocks.io/v1alpha1.Addon)
 
 
 ## 集成流程
@@ -201,6 +215,11 @@ Cluste对象主要描述:
 ```bash
 kubectl apply -f oracle-mysql-cluster.yaml
 ```
+或者使用 `kbcli` 工具创建集群实例
+```bash
+kbcli cluster create mycluster --cluster-definition oracle-mysql --cluster-version oracle-mysql-8.0.32
+```
+
 2. 查看集群状态
 然后就可以看到一个名为`mycluster`的集群实例被创建了。
 ```bash
@@ -227,6 +246,124 @@ kbcli cluster vscale mycluster --components mysql-comp --cpu 2 --memory 2Gi
 ```
 该操作会生成一个`VerticalScaling`类型的`OpsRequest`对象, 用于修改集群的资源配置, 通过`kubectl get opsrequest`命令可以查看该操作的进度.
 
+## 用Helm部署集群
+前文介绍了如何通过`YAML`文件创建集群模版, 不论是`ClusterDefinition`还是`ClusterVersion`都是通过`YAML`文件来定义的, 但是在实际生产环境中, 通过`YAML`文件来管理会比较麻烦, 推荐使用`Helm`来管理[Helm Tutorial](https://helm.sh/docs/intro/quickstart/)
+
+在`./chart`目录下提供了`Helm`示例, 可以通过`Helm`部署模板
+```bash
+kubectl create ns demo
+helm -n demo install oracle-mysql ./chart/oracle-mysql
+```
+
+通过`Helm`创建集群, 例如
+```bash
+kubectl create ns cluster-demo
+helm -n cluster-demo install mycluster ./chart/oracle-mysql-cluster
+```
+
+## 用Addon CR管理模版
+到目前为止, 我们掌握了在本地开发环境部署集群的方法, 但是如何让KubeBlocks的用户都能用上呢? 为了解决这个问题, 我们可以使用Addon CR来管理你的模版.
+KubeBlocks用`Addon`来管理两类插件:
+- 数据库引擎插件, 例如 ApeCloud-MySQL, Nebula-Graph, StarRocks. 更多引擎插件可以在 [kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons/)找到
+- 应用插件, 例如 snapshot-controller, Kube-Bench, fault-chaos-mesh等.
+
+### 打包helm chart
+首先我们要把`Helm`模板打包成`tgz`文件, 例如
+```bash
+helm package ./chart/oracle-mysql
+```
+并推送到`Helm`仓库, 例如
+```bash
+helm push oracle-mysql-0.1.0.tgz <your-helm-repo>
+```
+
+### 创建Addon CR
+```yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.8.0'  # 插件支持的KubeBlocks版本, 用于兼容不同版本的KubeBlocks
+  labels:
+    addon.kubeblocks.io/model: RDBMS                   # 插件包装的引擎类型, 常用的有RDBMS, NoSQL, Graph等
+    addon.kubeblocks.io/provider: ApeCloud             # 插件提供者
+    addon.kubeblocks.io/version: 0.1.0                 # 插件版本, 用于区分不同版本的插件
+  name: oracle-mysql                                   # Addon名称, 通常用引擎名表示
+spec:
+  description: MySQL is a widely used, open-source relational database management system (RDBMS).
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/152630/packages/helm/stable/charts/oracle-mysql-0.1.0.tgz # helm chart的地址
+    installValues:   # helm install时的参数, 对应`values.yaml`文件
+      setValues:
+        - "image.registry=docker.io"
+  install:
+    enabled: false
+  defaultInstallValues:
+  - enabled: false
+  type: Helm
+```
+1. 清理环境, 删除已有的ClusterDefinition和ClusterVersion
+```bash
+kubectl get cd,cv,cluster
+```
+若存上述的资源, 需要先删除
+
+2. 部署Addon CR
+```bash
+kubectl apply -f oracle-mysql-addon.yaml
+```
+3. 查看Addon状态
+```bash
+kubectl get addon oracle-mysql
+```
+可以看到输出如下信息
+```text
+NAME           TYPE   STATUS     AGE
+oracle-mysql   Helm   Disabled   15s
+```
+
+可以通过kbcli查看
+```bash
+kbcli addon list oracle-mysql
+```
+可以看到输出如下信息
+```text
+NAME           VERSION   PROVIDER   STATUS     AUTO-INSTALL
+oracle-mysql   0.1.0     ApeCloud   Disabled   false
+```
+这里的`STATUS`显示为"Disabled"表示Addon创建成功, 但是没有自动安装
+
+4. 可以通过`kbcli addon install oracle-mysql`命令来安装Addon
+```bash
+kbcli addon install oracle-mysql
+```
+在kb-system名空间下会生成一个名为`install-oracle-mysql-addon`类型的`Job`对象, 用于安装Addon. 它会通过`Helm`安装`addon.spec.helm.chartLocationURL`中指定的chart.
+
+此时, 查看到的Addon状态从 Disabled 变为 Enabling, 最终变为 Endabled, 表示Addon安装成功.
+
+通过分发Addon CR, 所有KubeBlocks用户都可以通过`kbcli addon install oracle-mysql`命令来安装Addon, 从而创建集群实例.
+
+> 所有提交到`kubeblocks-addons`仓库的插件都会有一个对应的Aaddon CR, 用户可以通过`kbcli addon search`命令查看所有的插件.
+> 为了方便用户使用, 可以通过`kbcli addon install <addon-name>`命令来安装插件.
+
+
+## YAML, Helm, Addon 到底选哪一个
+如果你对Helm Chart不熟悉, 在本地开发环境测试集成流程时, 推荐使用`YAML`快速开发, 通过`kubectl apply -f`命令来部署集群模版, 创建集群实例.
+测试通过后可以利用Helm的模版功能来优化上述文件构并建成Helm Chart, 可以参考[Heml 开发指南](https://helm.sh/zh/docs/chart_template_guide/getting_started/)
+
+如果你对Helm Chart熟悉, 推荐使用`Helm`来部署集群模版, 创建集群实例.
+推荐为你的集群模版(ClusterDefinition和ClusterVersion)和集群(Cluster)分别创建一个Helm Chart, 方便用户灵活部署.
+例如, 在本教程中,
+```txt
+├── charts
+│   ├── oracle-mysql          # chart for ClusterDefinition and ClusterVersion
+│   └── oracle-mysql-cluster  # chart for Cluster
+```
+更多引擎插件的例子可以在 [kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons/)找到
+
+
+Addon 可以理解为KubeBlocks的插件管理方式. 你可以通过`kbcli addon search/upgrade/install/uninstall <addon-name>`命令来管理插件及其版本.
+插件开发完成后, 如果你想让KubeBlocks的用户都能用上, 我们推荐使用`Addon`来管理, 它描述了插件的基本信息, 例如依赖的KubeBlocks版本, 插件的提供者, 插件的版本, 默认安装参数等.
 
 ## Q&A
 ### Question 1. ClusterVersion状态为"Unavailable"是什么原因?

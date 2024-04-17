@@ -1,0 +1,29 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  clusterVersionRef: {{ .Values.version }}
+  terminationPolicy: {{ .Values.terminationPolicy }}
+  clusterDefinitionRef: oracle-mysql # ref clusterdefinition.name
+  componentSpecs:
+    - name: mysql-comp
+      componentDefRef: mysql-compdef # ref clusterdefinition componentDefs.name
+      replicas: {{ .Values.replicas }}
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            storageClassName: {{ .Values.storageClassName }}
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: {{ print .Values.storage "Gi" }}
+      resources:
+        limits:
+          cpu: {{ .Values.cpu | quote }}
+          memory: {{ print .Values.memory "Gi" | quote }}

@@ -3,11 +3,24 @@ This series of tutorials uses Oracle MySQL Standalone Cluster as an example, int
 
 ## Goals
 Introduce how to create a MySQL database instance on KubeBlocks.
+The YAML examples used in the tutorial can be found in the `./examples` directory, and Helm examples are also provided in the `./chart` directory.
+```txt
+├── README-cn.md  # readme 文件
+├── README-en.md  # readme 文件
+├── charts        # Helm 示例
+│   ├── oracle-mysql  # clusterdefiniton和clusterversion的Helm示例
+│   └── oracle-mysql-cluster # cluster的Helm示例
+└── examples      # YAML 示例
+    ├── mycluster.yaml
+    ├── oracle-mysql-cd.yaml
+    └── oracle-mysql-cv.yaml
+```
+
 
 ## CRDs
 - [ClusterDefinition](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1alpha1.ClusterDefinition)
 - [ClusterVersion](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1alpha1.ClusterVersion)
-
+- [Addon](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/add-on#extensions.kubeblocks.io/v1alpha1.Addon)
 
 ## Integration Process
 ### Understand the Cluster Architecture
@@ -19,7 +32,7 @@ First, you should clarify the architecture of the cluster, including
 
 #### Describe the Cluster Topology using ClusterDefinition
 
-Create a ClusterDefinition object to describe the cluster topology, and save it as oracle-mysql-cd.yaml file
+Create a ClusterDefinition object to describe the cluster topology, and save it as `oracle-mysql-cd.yaml` file
 
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -221,6 +234,118 @@ kbcli cluster vscale mycluster --components mysql-comp --cpu 2 --memory 2Gi
 ```
 This operation will generate a `OpsRequest` object of type `VerticalScaling`. You can view the progress of this operation by using the `kubectl get opsrequest` command.
 
+## Deploying with Helm Charts
+The previous sections introduced how to create a cluster template through YAML files. Both ClusterDefinition and ClusterVersion are defined through YAML files. However, managing through YAML files can be cumbersome in actual production environments. It is recommended to use Helm for management. Helm Tutorial](https://helm.sh/docs/intro/quickstart/)
+
+Helm examples are provided in the ./chart directory, and you can deploy templates through Helm.
+```bash
+kubectl create ns demo
+helm -n demo install oracle-mysql ./chart/oracle-mysql
+```
+
+You can create a cluster through Helm, for example:
+```bash
+kubectl create ns cluster-demo
+helm -n cluster-demo install mycluster ./chart/oracle-mysql-cluster
+```
+
+## Using Addon CR to Manage
+So far, we have shown how to deploy clusters in a local development environment, but how can we make it available to all KubeBlocks users? To solve this problem, we can use `Addon` CR to manage aforementioned templates. KubeBlocks uses Addon to manage two types of plugins:
+- Database engine plugins, such as ApeCloud-MySQL, Nebula-Graph, StarRocks. More engine plugins can be found at [kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons/)
+- Application plugins, such as snapshot-controller, Kube-Bench, fault-chaos-mesh, etc.
+
+### Packaging Helm chart
+First, we need to package the Helm template into a tgz file, for example
+```bash
+helm package ./chart/oracle-mysql
+```
+and push it to your Helm repository, for example
+```bash
+helm push oracle-mysql-0.1.0.tgz <your-helm-repo>
+```
+### Create an Addon CR
+```yaml
+apiVersion: extensions.kubeblocks.io/v1alpha1
+kind: Addon
+metadata:
+  annotations:
+    addon.kubeblocks.io/kubeblocks-version: '>=0.8.0'  # KubeBlocks version requirement
+  labels:
+    addon.kubeblocks.io/model: RDBMS                   # Addon Mode, such as RDBMS, NoSQL, Graph
+    addon.kubeblocks.io/provider: ApeCloud             # Addon Provider
+    addon.kubeblocks.io/version: 0.1.0                 # Addon Version
+  name: oracle-mysql                                   # Addon Name
+spec:
+  description: MySQL is a widely used, open-source relational database management system (RDBMS). # Addon Description
+  helm:
+    chartLocationURL: https://jihulab.com/api/v4/projects/152630/packages/helm/stable/charts/oracle-mysql-0.1.0.tgz # helm chart URL
+    installValues:   # helm install values, you can modify the values according to your needs
+      setValues:     # helm set values, here we set the image registry to docker.io for example
+        - "image.registry=docker.io"
+  install:           # whether to enable the Addon
+    enabled: false
+  defaultInstallValues: # default install values
+  - enabled: false
+  type: Helm
+```
+With the evolution of KubeBlocks API, we strongly recommend that you specify the `addon.kubeblocks.io/kubeblocks-version` field in the Addon CR to ensure compatibility with the KubeBlocks version. If the KubeBlocks version does not meet the requirements, the Addon will not be installed.
+
+1. List and delete existing ClusterDefinition and ClusterVersion, if any
+```bash
+kubectl get cd,cv,cluster # List existing ClusterDefinition, ClusterVersion, and Cluster
+```
+If the above resources exist, they need to be deleted first
+
+2. Deploy Addon CR
+```bash
+kubectl apply -f oracle-mysql-addon.yaml
+```
+
+3. Check the status of the Addon
+```bash
+kubectl get addon oracle-mysql
+```
+You will see the following output information
+```text
+NAME           TYPE   STATUS     AGE
+oracle-mysql   Helm   Disabled   15s
+```
+Or you can use `kbcli` to check the detailed information of the Addon
+```bash
+kbcli addon list oracle-mysql
+```
+You can see the following output
+```text
+NAME           VERSION   PROVIDER   STATUS     AUTO-INSTALL
+oracle-mysql   0.1.0     ApeCloud   Disabled   false
+```
+The `STATUS` is displayed as "Disabled", which means that the Addon is not enabled yet.
+
+4. Enable the Addon
+```bash
+kbcli addon enable oracle-mysql
+```
+A `Job` object named `install-oracle-mysql-addon` will be generated in the `kb-system` namespace to install the Addon. It will install the chart specified in `addon.spec.helm.chartLocationURL` through Helm, and once the installation is complete, the status of the Addon will be updated to "Enabled".
+
+## YAML, Helm, Addon, Which One to Use And When?
+If you are not familiar with Helm Chart, when testing the integration process in a local development environment, it is recommended to use YAML for rapid development, and use the `kubectl apply -f` command to deploy the cluster template and create cluster instances. After the test passes, you can use Helm's template function to optimize the above file structure and build it into a Helm Chart. You can refer to the [Helm Development Guide]((https://helm.sh/zh/docs/chart_template_guide/getting_started/))
+
+Otherwise,  it is recommended to create a Helm Chart for your cluster template (ClusterDefinition and ClusterVersion) and cluster (Cluster) respectively, to facilitate flexible deployments.
+
+E.g., in this tutorial, we provide two helm charts
+```txt
+├── charts
+│   ├── oracle-mysql          # chart for ClusterDefinition and ClusterVersion
+│   └── oracle-mysql-cluster  # chart for Cluster
+```
+You may refer to [kubeblocks-addons](https://github.com/apecloud/kubeblocks-addons/) for more examples.
+
+Addon CRs are used to manage those Addons for KubeBlocks.
+You can use the `kbcli addon search/upgrade/install/uninstall <addon-name>` command to manage addons and their versions, and once the Addon is enabled/disabled, the corresponding Helm Chart (say, oracle-mysql) will be installed/uninstalled automatically.
+
+With the evolution of the KubeBlocks ecosystem, more and more Addons will be provided, and you can use Addon CRs to manage them in a more flexible way.
+
+As a developer, you can choose the appropriate method according to your actual needs.
 
 ## Q&A
 ### Question 1. What is the reason for the ClusterVersion status being "Unavailable"?
