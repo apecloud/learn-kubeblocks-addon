@@ -514,3 +514,4 @@ Besides, you can create a `values.schema.json` file to impose a schema on your v
 - [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
 - [KubeBlocks Addons](https://github.com/apecloud/kubeblocks-addons/)
 - [Helm JSON Schema](https://helm.sh/docs/topics/charts/#schema-files)
+- [Validate Helm Chart Values with JSON Schema](https://www.arthurkoziel.com/validate-helm-chart-values-with-json-schemas/)

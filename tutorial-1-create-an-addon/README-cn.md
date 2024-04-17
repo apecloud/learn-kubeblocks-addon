@@ -517,7 +517,6 @@ kubectl get storageclass
 kubectl patch storageclass <storageclass-name> -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
 
-
 ### Question 7. 如何快速调试Helm Chart?
 参考[Helm 调试模板](https://helm.sh/zh/docs/chart_template_guide/debugging//),
 在本地开发环境中, 可以用一下命令来快速调试Helm Chart
@@ -525,10 +524,11 @@ kubectl patch storageclass <storageclass-name> -p '{"metadata": {"annotations":{
 - `helm template --debug` 在本地测试渲染chart模板
 - `helm install --dry-run --debug`, 这是让服务器渲染模板的好方法，然后返回生成的清单文件
 - `helm get manifest` 这是查看安装在服务器上的模板的好方法。
-此外, 我们还可以在helm chart中添加一个`valeus.schema.json`文件, 用于描述`values.yaml`文件的schema.
+此外, 我们还可以在helm chart中添加一个`valeus.schema.json`文件, 用于描述`values.yaml`文件的schema; 或者添加一个`validation.yaml`文件, 用于描述`values.yaml`文件的校验规则.
 
 ## Reference
 - [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)
 - [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
 - [KubeBlocks Addons](https://github.com/apecloud/kubeblocks-addons/)
 - [Helm JSON Schema](https://helm.sh/docs/topics/charts/#schema-files)
+- [Validate Helm Chart Values with JSON Schema](https://www.arthurkoziel.com/validate-helm-chart-values-with-json-schemas/)
