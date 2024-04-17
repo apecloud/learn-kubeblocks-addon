@@ -497,3 +497,20 @@ And set one of the StorageClass as the default StorageClass with the following c
 ```bash
 kubectl patch storageclass <storageclass-name> -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
+
+
+### Question 7. How to debug Helm Chart?
+There are a few commands that can help you debug. Refer to the [Helm Debugging Guide](https://helm.sh/docs/chart_template_guide/debugging/)
+
+- `helm lint` is your go-to tool for verifying that your chart follows best practices
+- `helm template --debug` will test rendering chart templates locally.
+- `helm install --dry-run --debug` will also render your chart locally without installing it, but will also check if conflicting resources are already running on the cluster. Setting --dry-run=server will additionally execute any lookup in your chart towards the server.
+- `helm get manifest` This is a good way to see what templates are installed on the server.
+
+Besides, you can create a `values.schema.json` file to impose a schema on your values.yaml file.
+
+## Reference
+- [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)
+- [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
+- [KubeBlocks Addons](https://github.com/apecloud/kubeblocks-addons/)
+- [Helm JSON Schema](https://helm.sh/docs/topics/charts/#schema-files)
