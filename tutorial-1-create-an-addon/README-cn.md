@@ -71,7 +71,7 @@ spec:
           protocol: TCP
         resources: {}
         volumeMounts:
-        - mountPath: /var/lib/mysql
+        - mountPath: /var/lib/mysql   #  mountPath 为容器中的挂载路径, 需要根据实际情况修改
           name: data
     service:
       ports:
@@ -465,8 +465,8 @@ spec:
             storage: 20Gi
   terminationPolicy: Delete
 ```
-
-### Question 4. 如何在创建集群时指定StorageClss?
+s
+### Question 4. 如何在创建集群时指定StorageClass?
 在Cluster对象的`spec.componentSpecs[*].volumeClaimTemplates[*].spec.storageClassName`字段中指定存储类型, 例如
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -525,6 +525,50 @@ kubectl patch storageclass <storageclass-name> -p '{"metadata": {"annotations":{
 - `helm install --dry-run --debug`, 这是让服务器渲染模板的好方法，然后返回生成的清单文件
 - `helm get manifest` 这是查看安装在服务器上的模板的好方法。
 此外, 我们还可以在helm chart中添加一个`valeus.schema.json`文件, 用于描述`values.yaml`文件的schema; 或者添加一个`validation.yaml`文件, 用于描述`values.yaml`文件的校验规则.
+
+### Question 8. 为什么重启后数据丢失了?
+在Kubernetes中, 通过PersistentVolume来保证数据的持久性. 在创建集群后, KubeBlocks会自动创建一个PersistentVolumeClaim, 用于存储数据.
+如果集群重启后数据丢失, 可能是因为数据存储在本地, 没有使用PersistentVolume.
+1. 查看PersistentVolumeClaim状态是否为Bound, 记录该PVC的名字为"data-mycluster-mysql-comp-0"
+```bash
+k get pvc
+NAME                                                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+data-mycluster-mysql-comp-0   Bound    pvc-d6e66e51-859c-4597-abbd-beba09c0363d   20Gi       RWO            standard       165m
+```
+2. 查看POD使用的Volumes
+```bash
+kubectl get pod mycluster-mysql-comp-0 -ojson | jq '.spec.volumes'
+```
+会看到输出如下信息
+```json
+[
+  {
+    "name": "data",
+    "persistentVolumeClaim": {
+      "claimName": "data-mycluster-mysql-comp-0"
+    }
+  }
+  ...
+]
+```
+查看第一步中对应PVC的"name", 在本例中为"data"
+
+3. 查看Container中使用的VolumeMounts
+```bash
+kubectl get pod mycluster-mysql-comp-0 -ojson | jq '.spec.containers[0].volumeMounts'
+```
+会看到输出如下信息
+```json
+[
+  {
+    "mountPath": "/var/lib/mysql",
+    "name": "data"
+  }
+  ...
+]
+```
+查看`mountPath`字段, 在本例中为"/var/lib/mysql", 确认该目录是否和数据库引擎配置一致, 确保需要持久化的数据存储在该目录下.
+如果不一致, 需要修改`ClusterDefinition`中的`spec.componentDefs[*].podSpec.containers[*].volumeMounts[*].mountPath`字段, 使其和数据库配置一致. 修改后, 重新创建集群实例.
 
 ## Reference
 - [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)

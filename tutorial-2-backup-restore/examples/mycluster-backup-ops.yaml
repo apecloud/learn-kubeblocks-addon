@@ -1,0 +1,15 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: OpsRequest
+metadata:
+  name: backup-default-mycluster
+  namespace: default
+spec:
+  backupSpec:
+    backupMethod: xtrabackup
+    backupName: backup-default-mycluster-demo
+    backupPolicyName: mycluster-mysql-compdef-backup-policy
+    deletionPolicy: Delete
+  clusterRef: mycluster
+  ttlSecondsAfterSucceed: 30
+  ttlSecondsBeforeAbort: 0
+  type: Backup
