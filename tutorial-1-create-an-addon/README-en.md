@@ -509,8 +509,55 @@ There are a few commands that can help you debug. Refer to the [Helm Debugging G
 
 Besides, you can create a `values.schema.json` file to impose a schema on your values.yaml file.
 
+### Question 8. Why is data lost after a restart?
+In Kubernetes, data persistence is ensured through `PersistentVolumes`. After creating a cluster, KubeBlocks automatically creates a PersistentVolumeClaim (PVC) for data storage.
+If data is lost after a cluster restart, it may be because the data was stored locally and not on a PersistentVolume.
+
+1. Check if the PersistentVolumeClaim status is Bound, and record the name of the PVC as "data-mycluster-mysql-comp-0"
+```bash
+k get pvc
+NAME                                                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+data-mycluster-mysql-comp-0   Bound    pvc-d6e66e51-859c-4597-abbd-beba09c0363d   20Gi       RWO            standard       165m
+```
+2. Check the Volumes used by the POD
+```bash
+kubectl get pod mycluster-mysql-comp-0 -ojson | jq '.spec.volumes'
+```
+The output will show the following information:
+```json
+[
+  {
+    "name": "data",
+    "persistentVolumeClaim": {
+      "claimName": "data-mycluster-mysql-comp-0"
+    }
+  }
+  ...
+]
+```
+Refer to the "name" of the corresponding PVC in the first step, which in this case is "data".
+
+3. Check the VolumeMounts used in the Container
+```bash
+kubectl get pod mycluster-mysql-comp-0 -ojson | jq '.spec.containers[0].volumeMounts'
+```
+The output will show the following information:
+
+```json
+[
+  {
+    "mountPath": "/var/lib/mysql",
+    "name": "data"
+  }
+  ...
+]
+```
+Check the `mountPath` field, which in this case is "/var/lib/mysql", to ensure it matches the database engine configuration. Make sure that the data needing persistence is stored in this directory.
+If there is a mismatch, you need to modify the `mountPath` field in `ClusterDefinition under spec.componentDefs[*].podSpec.containers[*].volumeMounts[*]` to align with the database configuration. After modification, recreate the cluster instance.
+
 ## Reference
 - [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)
 - [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
 - [KubeBlocks Addons](https://github.com/apecloud/kubeblocks-addons/)
 - [Helm JSON Schema](https://helm.sh/docs/topics/charts/#schema-files)
+- [Validate Helm Chart Values with JSON Schema](https://www.arthurkoziel.com/validate-helm-chart-values-with-json-schemas/)
