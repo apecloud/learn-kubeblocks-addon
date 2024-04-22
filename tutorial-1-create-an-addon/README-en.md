@@ -555,6 +555,48 @@ The output will show the following information:
 Check the `mountPath` field, which in this case is "/var/lib/mysql", to ensure it matches the database engine configuration. Make sure that the data needing persistence is stored in this directory.
 If there is a mismatch, you need to modify the `mountPath` field in `ClusterDefinition under spec.componentDefs[*].podSpec.containers[*].volumeMounts[*]` to align with the database configuration. After modification, recreate the cluster instance.
 
+
+### Question 9. Permission Denied?
+When the Pod is running, but you encounter the following error message:
+```txt
+cannot access data directory: xxx : Permission denied
+```
+This error message indicates that the container does not have permission to write to the specified directory.
+
+To solve this issue, we can setup requested permission through `initContainer`, e.g.,
+```yaml
+  podSpec:
+    initContainers:
+      - name: volume-permissions
+        image: busybox:1.28
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/sh
+          - -ec
+          - |
+            chown -R groupid:userid /mounted/path
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: data
+            mountPath: /mounted/path
+    containers:
+      - name: etcd
+        imagePullPolicy: "IfNotPresent"
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: userid
+        volumeMounts:
+          - mountPath: /mounted/path
+            name: data
+        ports:
+        ...
+```
+The `initContainer` in this configuration is primarily used to ensure the correct file permissions on a mounted volume before the main containers start.
+By adjusting the permissions beforehand, this setup avoids permission-related issues when the main containers try to access the volume.
+
+You may refer to [Greptime](https://github.com/apecloud/kubeblocks-addons/blob/e22dc624905183b91ccb5d87512bdc491b454849/addons/greptimedb/templates/clusterdefinition.yaml#L349) as an example.
+
 ## Reference
 - [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)
 - [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)

@@ -570,6 +570,48 @@ kubectl get pod mycluster-mysql-comp-0 -ojson | jq '.spec.containers[0].volumeMo
 查看`mountPath`字段, 在本例中为"/var/lib/mysql", 确认该目录是否和数据库引擎配置一致, 确保需要持久化的数据存储在该目录下.
 如果不一致, 需要修改`ClusterDefinition`中的`spec.componentDefs[*].podSpec.containers[*].volumeMounts[*].mountPath`字段, 使其和数据库配置一致. 修改后, 重新创建集群实例.
 
+### Question 9. Permission Denied? 目录没有权限写入, 如何解决
+如果容器启动时, 看到如下的错误信息
+```txt
+cannot access data directory: xxx : Permission denied
+```
+说明容器没有权限写入该目录(文件夹只有owner(也就是root)才有写权限.)
+
+不同StorageClass的默认行为不同, 为了解决该问题, 可以通过`initContainer`来修改目录的权限, 例如:
+```yaml
+  podSpec:
+    initContainers:
+      - name: volume-permissions
+        image: busybox:1.28
+        imagePullPolicy: IfNotPresent
+        command:
+          - /bin/sh
+          - -ec
+          - |
+            chown -R groupid:userid /mounted/path
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+          - name: data
+            mountPath: /mounted/path
+    containers:
+      - name: etcd
+        imagePullPolicy: "IfNotPresent"
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: userid
+        volumeMounts:
+          - mountPath: /mounted/path
+            name: data
+        ports:
+        ...
+```
+
+这个配置中，initContainer 主要用于在主容器启动之前确保挂载卷上的文件权限正确。在这个例子中，initContainer 会将 `/mounted/path` 目录的所有者更改为`userid:groupid`。这样，主容器就可以在 `/mounted/path` 目录中写入文件了。`groupid:userid` 和挂载的路径 `/mounted/path` 需要根据实际情况修改。
+可以参考案例[Greptime](https://github.com/apecloud/kubeblocks-addons/blob/e22dc624905183b91ccb5d87512bdc491b454849/addons/greptimedb/templates/clusterdefinition.yaml#L349)
+
+
+
 ## Reference
 - [KubeBlocks API Reference](https://kubeblocks.io/docs/release-0.8/developer_docs/api-reference/)
 - [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
