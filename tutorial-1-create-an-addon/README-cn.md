@@ -465,7 +465,7 @@ spec:
             storage: 20Gi
   terminationPolicy: Delete
 ```
-s
+
 ### Question 4. 如何在创建集群时指定StorageClass?
 在Cluster对象的`spec.componentSpecs[*].volumeClaimTemplates[*].spec.storageClassName`字段中指定存储类型, 例如
 ```yaml
