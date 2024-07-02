@@ -8,6 +8,6 @@ spec:
   - componentDefRef: mysql-compdef
     versionsContext:
       containers:
-      - name: mysql-container2
+      - name: mysql-container
         image: docker.io/mysql:8.0.32
         imagePullPolicy: IfNotPresent
